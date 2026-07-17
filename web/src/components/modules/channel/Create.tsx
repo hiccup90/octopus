@@ -14,7 +14,7 @@ export function CreateDialogContent() {
     const createChannel = useCreateChannel();
     const [formData, setFormData] = useState<ChannelFormData>({
         name: '',
-        type: ChannelType.OpenAIChat,
+        type: ChannelType.Passthrough,
         base_urls: [{ url: '', delay: 0 }],
         custom_header: [],
         channel_proxy: '',
@@ -66,7 +66,7 @@ export function CreateDialogContent() {
                 onSuccess: () => {
                     setFormData({
                         name: '',
-                        type: ChannelType.OpenAIChat,
+                        type: ChannelType.Passthrough,
                         base_urls: [{ url: '', delay: 0 }],
                         custom_header: [],
                         channel_proxy: '',

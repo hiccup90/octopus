@@ -5,11 +5,10 @@ export type ToolbarLayout = 'grid' | 'list';
 export type ToolbarSortOrder = 'asc' | 'desc';
 export type ToolbarSortField = 'name' | 'created';
 export type ToolbarCreatedSortablePage = 'channel' | 'group';
-export const TOOLBAR_PAGES = ['channel', 'group', 'model'] as const;
+export const TOOLBAR_PAGES = ['channel', 'group'] as const;
 export type ToolbarPage = (typeof TOOLBAR_PAGES)[number];
 export type ChannelFilter = 'all' | 'enabled' | 'disabled';
 export type GroupFilter = 'all' | 'with-members' | 'empty';
-export type ModelFilter = 'all' | 'priced' | 'free';
 
 interface ToolbarViewOptionsState {
     layouts: Partial<Record<ToolbarPage, ToolbarLayout>>;
@@ -17,7 +16,6 @@ interface ToolbarViewOptionsState {
     sortOrders: Partial<Record<ToolbarPage, ToolbarSortOrder>>;
     channelFilter: ChannelFilter;
     groupFilter: GroupFilter;
-    modelFilter: ModelFilter;
 
     getLayout: (item: ToolbarPage) => ToolbarLayout;
     setLayout: (item: ToolbarPage, value: ToolbarLayout) => void;
@@ -34,7 +32,6 @@ interface ToolbarViewOptionsState {
 
     setChannelFilter: (value: ChannelFilter) => void;
     setGroupFilter: (value: GroupFilter) => void;
-    setModelFilter: (value: ModelFilter) => void;
 }
 
 export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
@@ -45,7 +42,6 @@ export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
             sortOrders: {},
             channelFilter: 'all',
             groupFilter: 'all',
-            modelFilter: 'all',
 
             getLayout: (item) => get().layouts[item] || 'grid',
             setLayout: (item, value) => {
@@ -67,7 +63,6 @@ export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
 
             setChannelFilter: (value) => set({ channelFilter: value }),
             setGroupFilter: (value) => set({ groupFilter: value }),
-            setModelFilter: (value) => set({ modelFilter: value }),
         }),
         {
             name: 'toolbar-view-options-storage',
@@ -77,7 +72,6 @@ export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
                 sortOrders: state.sortOrders,
                 channelFilter: state.channelFilter,
                 groupFilter: state.groupFilter,
-                modelFilter: state.modelFilter,
             }),
         }
     )

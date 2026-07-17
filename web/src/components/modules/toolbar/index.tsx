@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 import { useNavStore, type NavItem } from '@/components/modules/navbar';
 import { CreateDialogContent as ChannelCreateContent } from '@/components/modules/channel/Create';
 import { CreateDialogContent as GroupCreateContent } from '@/components/modules/group/Create';
-import { CreateDialogContent as ModelCreateContent } from '@/components/modules/model/Create';
 import { useTranslations } from 'next-intl';
 import { useSearchStore } from './search-store';
 import {
@@ -24,14 +23,12 @@ import {
     type ToolbarPage,
     type ChannelFilter,
     type GroupFilter,
-    type ModelFilter,
     type ToolbarSortField,
     type ToolbarSortOrder,
 } from './view-options-store';
 
 const CHANNEL_FILTER_OPTIONS: ChannelFilter[] = ['all', 'enabled', 'disabled'];
 const GROUP_FILTER_OPTIONS: GroupFilter[] = ['all', 'with-members', 'empty'];
-const MODEL_FILTER_OPTIONS: ModelFilter[] = ['all', 'priced', 'free'];
 type CombinedSortOption = {
     value: `${ToolbarSortField}-${ToolbarSortOrder}`;
     field: ToolbarSortField;
@@ -55,8 +52,6 @@ function CreateDialogContent({ activeItem }: { activeItem: ToolbarPage }) {
             return <ChannelCreateContent />;
         case 'group':
             return <GroupCreateContent />;
-        case 'model':
-            return <ModelCreateContent />;
     }
 }
 
@@ -76,10 +71,8 @@ export function Toolbar() {
     const setSortOrder = useToolbarViewOptionsStore((s) => s.setSortOrder);
     const channelFilter = useToolbarViewOptionsStore((s) => s.channelFilter);
     const groupFilter = useToolbarViewOptionsStore((s) => s.groupFilter);
-    const modelFilter = useToolbarViewOptionsStore((s) => s.modelFilter);
     const setChannelFilter = useToolbarViewOptionsStore((s) => s.setChannelFilter);
     const setGroupFilter = useToolbarViewOptionsStore((s) => s.setGroupFilter);
-    const setModelFilter = useToolbarViewOptionsStore((s) => s.setModelFilter);
     const [expandedSearchItem, setExpandedSearchItem] = useState<ToolbarPage | null>(null);
     const searchExpanded = expandedSearchItem === toolbarItem;
 
@@ -97,32 +90,17 @@ export function Toolbar() {
         'with-members': 'popover.filter.group.withMembers',
         empty: 'popover.filter.group.empty',
     };
-    const modelFilterLabelKeys: Record<ModelFilter, string> = {
-        all: 'popover.filter.model.all',
-        priced: 'popover.filter.model.priced',
-        free: 'popover.filter.model.free',
-    };
-
     const filterOptions = toolbarItem === 'channel'
         ? CHANNEL_FILTER_OPTIONS.map((value) => ({
             value,
             label: t(channelFilterLabelKeys[value]),
         }))
-        : toolbarItem === 'group'
-            ? GROUP_FILTER_OPTIONS.map((value) => ({
-                value,
-                label: t(groupFilterLabelKeys[value]),
-            }))
-            : MODEL_FILTER_OPTIONS.map((value) => ({
-                value,
-                label: t(modelFilterLabelKeys[value]),
-            }));
+        : GROUP_FILTER_OPTIONS.map((value) => ({
+            value,
+            label: t(groupFilterLabelKeys[value]),
+        }));
 
-    const activeFilter = toolbarItem === 'channel'
-        ? channelFilter
-        : toolbarItem === 'group'
-            ? groupFilter
-            : modelFilter;
+    const activeFilter = toolbarItem === 'channel' ? channelFilter : groupFilter;
 
     const handleFilterChange = (value: string) => {
         switch (toolbarItem) {
@@ -131,9 +109,6 @@ export function Toolbar() {
                 break;
             case 'group':
                 setGroupFilter(value as GroupFilter);
-                break;
-            case 'model':
-                setModelFilter(value as ModelFilter);
                 break;
         }
     };

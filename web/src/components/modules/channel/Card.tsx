@@ -36,11 +36,13 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const enabledKeyCount = channel.keys.filter((item) => item.enabled).length;
 
     // Same selection rule as backend GetBaseUrl: lowest delay among base_urls.
+    // delay=0 means not measured yet (default), so treat as unavailable.
     const bestDelay = (() => {
         const urls = channel.base_urls ?? [];
         let best: number | null = null;
         for (const item of urls) {
             if (!item?.url) continue;
+            if (!item.delay || item.delay <= 0) continue;
             if (best === null || item.delay < best) best = item.delay;
         }
         return best;
@@ -64,21 +66,21 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
         <MorphingDialog>
             <MorphingDialogTrigger className="w-full">
                 <article className="flex flex-col gap-4 rounded-3xl border border-border bg-card text-card-foreground p-4 transition-all duration-300">
-                    <header className="relative flex items-center gap-2">
-                        <div className="min-w-0 flex-1">
+                    <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <div className="min-w-0">
                             <Tooltip side="top" sideOffset={10} align="center">
                                 <TooltipTrigger asChild>
-                                    <h3 className="text-lg font-bold truncate">{channel.name}</h3>
+                                    <h3 className="text-lg font-bold truncate leading-none">{channel.name}</h3>
                                 </TooltipTrigger>
                                 <TooltipContent key={channel.name}>{channel.name}</TooltipContent>
                             </Tooltip>
                         </div>
-                        {bestDelay !== null && (
-                            <div className="absolute left-1/2 -translate-x-1/2 shrink-0 pointer-events-none">
+                        <div className="flex items-center justify-center">
+                            {bestDelay !== null && (
                                 <Badge
                                     variant="secondary"
                                     className={cn(
-                                        "h-5 px-1.5 text-xs tabular-nums",
+                                        "h-5 px-1.5 text-xs tabular-nums leading-none",
                                         bestDelay < 300
                                             ? "bg-green-500/15 text-green-700 dark:text-green-400"
                                             : bestDelay < 1000
@@ -88,9 +90,9 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                 >
                                     {bestDelay}ms
                                 </Badge>
-                            </div>
-                        )}
-                        <div className="shrink-0 ml-auto">
+                            )}
+                        </div>
+                        <div className="flex justify-end">
                             <Switch
                                 checked={channel.enabled}
                                 onCheckedChange={handleEnableChange}

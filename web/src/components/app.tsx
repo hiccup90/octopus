@@ -130,15 +130,6 @@ export function AppContainer() {
                             );
                             break;
                         }
-                        case 'model': {
-                            prefetches.push(
-                                queryClient.prefetchQuery({
-                                    queryKey: ['models', 'list'],
-                                    queryFn: async () => apiClient.get('/api/v1/model/list'),
-                                })
-                            );
-                            break;
-                        }
                         case 'setting': {
                             prefetches.push(
                                 queryClient.prefetchQuery({

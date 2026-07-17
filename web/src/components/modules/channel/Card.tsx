@@ -36,13 +36,12 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const enabledKeyCount = channel.keys.filter((item) => item.enabled).length;
 
     // Same selection rule as backend GetBaseUrl: lowest delay among base_urls.
-    // delay=0 means not measured yet (default), so treat as unavailable.
+    // delay=0 is shown as-is (unmeasured / just created).
     const bestDelay = (() => {
         const urls = channel.base_urls ?? [];
         let best: number | null = null;
         for (const item of urls) {
             if (!item?.url) continue;
-            if (!item.delay || item.delay <= 0) continue;
             if (best === null || item.delay < best) best = item.delay;
         }
         return best;

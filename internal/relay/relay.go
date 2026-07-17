@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -360,6 +361,11 @@ func (ra *relayAttempt) sendRequest(req *http.Request) (*http.Response, error) {
 	return response, nil
 }
 
+// errEmptyUpstreamStream marks a 200 SSE stream that ended without forwarding
+// any payload. Mirrors Plus empty-stream detection so the attempt fails and
+// the relay can fail over while nothing has been written to the client yet.
+var errEmptyUpstreamStream = errors.New("upstream stream ended without forwarding any payload")
+
 // handleStreamResponse 处理流式响应
 func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http.Response) error {
 	if ct := response.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "text/event-stream") {
@@ -374,6 +380,7 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 	ra.c.Header("X-Accel-Buffering", "no")
 
 	firstToken := true
+	payloadWritten := false
 
 	type sseReadResult struct {
 		event sse.Event
@@ -415,6 +422,12 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 			return fmt.Errorf("first token timeout (%ds)", ra.firstTokenTimeOutSec)
 		case r, ok := <-results:
 			if !ok {
+				// Empty 200 stream: treat as failure so balancer can fail over.
+				// Only when nothing was written yet (safe to retry other channels).
+				if !payloadWritten {
+					log.Warnf("upstream stream ended without forwarding any payload")
+					return errEmptyUpstreamStream
+				}
 				log.Infof("stream end")
 				return nil
 			}
@@ -442,8 +455,11 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 				}
 			}
 
-			ra.c.Writer.Write(data)
+			if _, werr := ra.c.Writer.Write(data); werr != nil {
+				return fmt.Errorf("failed to write stream: %w", werr)
+			}
 			ra.c.Writer.Flush()
+			payloadWritten = true
 		}
 	}
 }

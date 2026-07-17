@@ -129,7 +129,7 @@ func (c *Channel) GetChannelKey() ChannelKey {
 	nowSec := time.Now().Unix()
 
 	best := ChannelKey{}
-	bestCost := 0.0
+	bestLastUse := int64(0)
 	bestSet := false
 
 	for _, k := range c.Keys {
@@ -141,9 +141,10 @@ func (c *Channel) GetChannelKey() ChannelKey {
 				continue
 			}
 		}
-		if !bestSet || k.TotalCost < bestCost {
+		// Prefer least-recently-used key (cost-based balancing removed).
+		if !bestSet || k.LastUseTimeStamp < bestLastUse {
 			best = k
-			bestCost = k.TotalCost
+			bestLastUse = k.LastUseTimeStamp
 			bestSet = true
 		}
 	}

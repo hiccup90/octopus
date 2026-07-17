@@ -15,11 +15,6 @@ export function Rank() {
     const rankSortMode = useHomeViewStore((state) => state.rankSortMode);
     const setRankSortMode = useHomeViewStore((state) => state.setRankSortMode);
 
-    const rankedByCost = useMemo<ChannelData[]>(() => {
-        if (!channelData) return [];
-        return [...channelData].sort((a, b) => b.formatted.total_cost.raw - a.formatted.total_cost.raw);
-    }, [channelData]);
-
     const rankedByCount = useMemo<ChannelData[]>(() => {
         if (!channelData) return [];
         return [...channelData].sort((a, b) => b.formatted.request_count.raw - a.formatted.request_count.raw);
@@ -97,18 +92,11 @@ export function Rank() {
                                             </span>
                                         </span>
                                     </div>
-                                ) : mode === 'tokens' ? (
+                                ) : (
                                     <span className="font-semibold text-base">
                                         {channel.formatted.total_token.formatted.value}
                                         <span className="text-xs text-muted-foreground">
                                             {channel.formatted.total_token.formatted.unit}
-                                        </span>
-                                    </span>
-                                ) : (
-                                    <span className="font-semibold text-base">
-                                        {channel.formatted.total_cost.formatted.value}
-                                        <span className="text-xs text-muted-foreground">
-                                            {channel.formatted.total_cost.formatted.unit}
                                         </span>
                                     </span>
                                 )}
@@ -126,15 +114,11 @@ export function Rank() {
                 <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-base">{t('title')}</h3>
                     <TabsList>
-                        <TabsTrigger value="cost">{t('sortByCost')}</TabsTrigger>
                         <TabsTrigger value="count">{t('sortByCount')}</TabsTrigger>
                         <TabsTrigger value="tokens">{t('sortByTokens')}</TabsTrigger>
                     </TabsList>
                 </div>
                 <TabsContents>
-                    <TabsContent value="cost">
-                        {renderList(rankedByCost, 'cost')}
-                    </TabsContent>
                     <TabsContent value="count">
                         {renderList(rankedByCount, 'count')}
                     </TabsContent>

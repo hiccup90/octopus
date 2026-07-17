@@ -5,7 +5,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { useTranslations } from 'next-intl';
-import { formatCount, formatMoney } from '@/lib/utils';
+import { formatCount } from '@/lib/utils';
 import dayjs from 'dayjs';
 import { AnimatedNumber } from '@/components/common/AnimatedNumber';
 import { Tabs, TabsList, TabsTrigger } from '@/components/animate-ui/components/animate/tabs';
@@ -28,7 +28,7 @@ export function StatsChart() {
     }, [statsDaily]);
 
     const getChartDataKey = (type: ChartMetricType) => {
-        return type === 'cost' ? 'total_cost' : type === 'count' ? 'request_count' : 'total_token';
+        return type === 'count' ? 'request_count' : 'total_token';
     };
 
     const chartData = useMemo(() => {
@@ -37,45 +37,37 @@ export function StatsChart() {
             if (!statsHourly) return [];
             return statsHourly.map((stat) => ({
                 date: `${stat.hour}:00`,
-                [dataKey]: chartMetricType === 'cost'
-                    ? stat.total_cost.raw
-                    : chartMetricType === 'count'
-                        ? stat.request_count.raw
-                        : (stat.input_token.raw + stat.output_token.raw),
+                [dataKey]: chartMetricType === 'count'
+                    ? stat.request_count.raw
+                    : (stat.input_token.raw + stat.output_token.raw),
             }));
         } else {
             const days = Number(period);
             return sortedDaily.slice(-days).map((stat) => ({
                 date: dayjs(stat.date).format('MM/DD'),
-                [dataKey]: chartMetricType === 'cost'
-                    ? stat.total_cost.raw
-                    : chartMetricType === 'count'
-                        ? (stat.request_success.raw + stat.request_failed.raw)
-                        : (stat.input_token.raw + stat.output_token.raw),
+                [dataKey]: chartMetricType === 'count'
+                    ? (stat.request_success.raw + stat.request_failed.raw)
+                    : (stat.input_token.raw + stat.output_token.raw),
             }));
         }
     }, [sortedDaily, statsHourly, period, chartMetricType]);
 
     const totals = useMemo(() => {
         if (period === '1') {
-            if (!statsHourly) return { requests: 0, cost: 0, tokens: 0 };
+            if (!statsHourly) return { requests: 0, tokens: 0 };
             const requests = statsHourly.reduce((acc, stat) => acc + stat.request_count.raw, 0);
-            const cost = statsHourly.reduce((acc, stat) => acc + stat.total_cost.raw, 0);
             const tokens = statsHourly.reduce((acc, stat) => acc + stat.input_token.raw + stat.output_token.raw, 0);
             return {
                 requests,
-                cost,
                 tokens,
             };
         } else {
             const days = Number(period);
             const recentStats = sortedDaily.slice(-days);
             const requests = recentStats.reduce((acc, stat) => acc + stat.request_success.raw + stat.request_failed.raw, 0);
-            const cost = recentStats.reduce((acc, stat) => acc + stat.total_cost.raw, 0);
             const tokens = recentStats.reduce((acc, stat) => acc + stat.input_token.raw + stat.output_token.raw, 0);
             return {
                 requests,
-                cost,
                 tokens,
             };
         }
@@ -84,12 +76,11 @@ export function StatsChart() {
     const chartConfig = useMemo(() => {
         const dataKey = getChartDataKey(chartMetricType);
         const labels = {
-            'total_cost': t('totalCost'),
             'request_count': t('totalRequests'),
             'total_token': t('totalTokens'),
         };
         return {
-            [dataKey]: { label: labels[dataKey] },
+            [dataKey]: { label: labels[dataKey as keyof typeof labels] },
         };
     }, [chartMetricType, t]);
 
@@ -111,13 +102,11 @@ export function StatsChart() {
 
 
     const getChartStroke = (type: ChartMetricType) => {
-        if (type === 'cost') return 'var(--chart-1)';
         if (type === 'count') return 'var(--chart-2)';
         return 'var(--chart-3)';
     };
 
     const getChartFill = (type: ChartMetricType) => {
-        if (type === 'cost') return 'url(#fillMetric1)';
         if (type === 'count') return 'url(#fillMetric2)';
         return 'url(#fillMetric3)';
     };
@@ -129,7 +118,6 @@ export function StatsChart() {
                     <h3 className="font-semibold text-base">{t('title')}</h3>
                     <Tabs value={chartMetricType} onValueChange={(value) => setChartMetricType(value as ChartMetricType)}>
                         <TabsList>
-                            <TabsTrigger value="cost">{t('metricType.cost')}</TabsTrigger>
                             <TabsTrigger value="count">{t('metricType.count')}</TabsTrigger>
                             <TabsTrigger value="tokens">{t('metricType.tokens')}</TabsTrigger>
                         </TabsList>
@@ -144,14 +132,6 @@ export function StatsChart() {
                             <div className="text-xl font-semibold">
                                 <AnimatedNumber value={formatCount(totals.requests).formatted.value} />
                                 <span className="ml-0.5 text-sm text-muted-foreground">{formatCount(totals.requests).formatted.unit}</span>
-                            </div>
-                        </div>
-                        <div className="w-px bg-border self-stretch"></div>
-                        <div>
-                            <div className="text-xs text-muted-foreground">{t('totalCost')}</div>
-                            <div className="text-xl font-semibold">
-                                <AnimatedNumber value={formatMoney(totals.cost).formatted.value} />
-                                <span className="ml-0.5 text-sm text-muted-foreground">{formatMoney(totals.cost).formatted.unit}</span>
                             </div>
                         </div>
                         <div className="w-px bg-border self-stretch"></div>
@@ -196,14 +176,8 @@ export function StatsChart() {
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(value) => {
-                            if (chartMetricType === 'cost') {
-                                const formatted = formatMoney(value);
-                                return `${formatted.formatted.value}${formatted.formatted.unit}`;
-                            } else if (chartMetricType === 'count' || chartMetricType === 'tokens') {
-                                const formatted = formatCount(value);
-                                return `${formatted.formatted.value}${formatted.formatted.unit}`;
-                            }
-                            return value.toString();
+                            const formatted = formatCount(value);
+                            return `${formatted.formatted.value}${formatted.formatted.unit}`;
                         }}
                     />
                     <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />

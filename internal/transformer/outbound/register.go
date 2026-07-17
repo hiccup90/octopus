@@ -5,6 +5,7 @@ import (
 	"github.com/bestruirui/octopus/internal/transformer/outbound/authropic"
 	"github.com/bestruirui/octopus/internal/transformer/outbound/gemini"
 	"github.com/bestruirui/octopus/internal/transformer/outbound/openai"
+	"github.com/bestruirui/octopus/internal/transformer/outbound/passthrough"
 	"github.com/bestruirui/octopus/internal/transformer/outbound/volcengine"
 )
 
@@ -17,11 +18,13 @@ const (
 	OutboundTypeGemini
 	OutboundTypeVolcengine
 	OutboundTypeOpenAIEmbedding
+	OutboundTypePassthrough
 )
 
 // EmbeddingChannelTypes 定义支持 embedding 请求的 channel 类型集合
 var EmbeddingChannelTypes = map[OutboundType]bool{
 	OutboundTypeOpenAIEmbedding: true,
+	OutboundTypePassthrough:     true,
 }
 
 // ChatChannelTypes 定义支持 chat 请求的 channel 类型集合
@@ -31,6 +34,7 @@ var ChatChannelTypes = map[OutboundType]bool{
 	OutboundTypeAnthropic:      true,
 	OutboundTypeGemini:         true,
 	OutboundTypeVolcengine:     true,
+	OutboundTypePassthrough:    true,
 }
 
 // IsEmbeddingChannelType 判断 channel 类型是否支持 embedding 请求
@@ -50,6 +54,7 @@ var outboundFactories = map[OutboundType]func() model.Outbound{
 	OutboundTypeAnthropic:       func() model.Outbound { return &authropic.MessageOutbound{} },
 	OutboundTypeGemini:          func() model.Outbound { return &gemini.MessagesOutbound{} },
 	OutboundTypeVolcengine:      func() model.Outbound { return &volcengine.ResponseOutbound{} },
+	OutboundTypePassthrough:     func() model.Outbound { return &passthrough.Outbound{} },
 }
 
 func Get(outboundType OutboundType) model.Outbound {

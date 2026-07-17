@@ -237,6 +237,8 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 
 	// Pass through the original query parameters
 	internalRequest.Query = c.Request.URL.Query()
+	internalRequest.RequestPath = c.Request.URL.Path
+	internalRequest.RawRequest = body
 
 	if err := internalRequest.Validate(); err != nil {
 		resp.Error(c, http.StatusBadRequest, err.Error())
@@ -374,8 +376,8 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 	firstToken := true
 
 	type sseReadResult struct {
-		data string
-		err  error
+		event sse.Event
+		err   error
 	}
 	results := make(chan sseReadResult, 1)
 	go func() {
@@ -386,7 +388,7 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 				results <- sseReadResult{err: err}
 				return
 			}
-			results <- sseReadResult{data: ev.Data}
+			results <- sseReadResult{event: ev}
 		}
 	}()
 
@@ -421,7 +423,7 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 				return fmt.Errorf("failed to read stream event: %w", r.err)
 			}
 
-			data, err := ra.transformStreamData(ctx, r.data)
+			data, err := ra.transformStreamEvent(ctx, r.event)
 			if err != nil || len(data) == 0 {
 				continue
 			}
@@ -446,9 +448,24 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 	}
 }
 
-// transformStreamData 转换流式数据
-func (ra *relayAttempt) transformStreamData(ctx context.Context, data string) ([]byte, error) {
-	internalStream, err := ra.outAdapter.TransformStream(ctx, []byte(data))
+// transformStreamEvent 转换流式数据
+func (ra *relayAttempt) transformStreamEvent(ctx context.Context, ev sse.Event) ([]byte, error) {
+	// Passthrough: rebuild SSE frame with original event type when present.
+	// Critical for Anthropic/Responses which rely on "event:" lines.
+	if ra.channel != nil && ra.channel.Type == outbound.OutboundTypePassthrough {
+		if ev.Data == "" && ev.Type == "" {
+			return nil, nil
+		}
+		// Best-effort token stats only; never block stream on parse errors.
+		if ev.Data != "" {
+			if internalStream, err := ra.outAdapter.TransformStream(ctx, []byte(ev.Data)); err == nil && internalStream != nil {
+				_, _ = ra.inAdapter.TransformStream(ctx, internalStream)
+			}
+		}
+		return formatSSEFrame(ev.Type, ev.Data), nil
+	}
+
+	internalStream, err := ra.outAdapter.TransformStream(ctx, []byte(ev.Data))
 	if err != nil {
 		log.Warnf("failed to transform stream: %v", err)
 		return nil, err
@@ -466,8 +483,53 @@ func (ra *relayAttempt) transformStreamData(ctx context.Context, data string) ([
 	return inStream, nil
 }
 
+func formatSSEFrame(eventType, data string) []byte {
+	var b strings.Builder
+	if eventType != "" {
+		b.WriteString("event: ")
+		b.WriteString(eventType)
+		b.WriteByte('\n')
+	}
+	// Preserve multi-line data payloads.
+	if data == "" {
+		b.WriteString("data: \n\n")
+		return []byte(b.String())
+	}
+	for _, line := range strings.Split(data, "\n") {
+		b.WriteString("data: ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	b.WriteByte('\n')
+	return []byte(b.String())
+}
+
 // handleResponse 处理非流式响应
 func (ra *relayAttempt) handleResponse(ctx context.Context, response *http.Response) error {
+	// Passthrough: return upstream body without protocol conversion.
+	if ra.channel != nil && ra.channel.Type == outbound.OutboundTypePassthrough {
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read passthrough response: %w", err)
+		}
+		// Still feed adapters for token metrics when response shape is compatible.
+		if internalResponse, err := ra.outAdapter.TransformResponse(ctx, &http.Response{
+			StatusCode: response.StatusCode,
+			Header:     response.Header.Clone(),
+			Body:       io.NopCloser(bytes.NewReader(body)),
+		}); err == nil && internalResponse != nil {
+			if _, err := ra.inAdapter.TransformResponse(ctx, internalResponse); err != nil {
+				// Ignore inbound transform errors in passthrough mode.
+			}
+		}
+		contentType := response.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		ra.c.Data(http.StatusOK, contentType, body)
+		return nil
+	}
+
 	internalResponse, err := ra.outAdapter.TransformResponse(ctx, response)
 	if err != nil {
 		log.Warnf("failed to transform response: %v", err)

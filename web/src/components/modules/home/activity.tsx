@@ -163,7 +163,6 @@ export function Activity() {
                                             { labelKey: 'requestCount', ...tooltip.day.formatted.request_count },
                                             { labelKey: 'waitTime', ...tooltip.day.formatted.wait_time },
                                             { labelKey: 'totalToken', ...tooltip.day.formatted.total_token },
-                                            { labelKey: 'totalCost', ...tooltip.day.formatted.total_cost },
                                         ].map((item, index) => (
                                             <Fragment key={index}>
                                                 <span className="wrap-break-word">{t(item.labelKey)}</span>

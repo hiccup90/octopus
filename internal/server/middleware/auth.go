@@ -69,12 +69,6 @@ func APIKeyAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		statsAPIKey := op.StatsAPIKeyGet(apiKeyObj.ID)
-		if apiKeyObj.MaxCost > 0 && apiKeyObj.MaxCost < statsAPIKey.StatsMetrics.OutputCost+statsAPIKey.StatsMetrics.InputCost {
-			resp.Error(c, http.StatusUnauthorized, "API key has reached the max cost")
-			c.Abort()
-			return
-		}
 		c.Set("request_type", requestType)
 		c.Set("supported_models", apiKeyObj.SupportedModels)
 		c.Set("api_key_id", apiKeyObj.ID)

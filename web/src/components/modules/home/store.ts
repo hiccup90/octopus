@@ -3,8 +3,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-export type RankSortMode = 'cost' | 'count' | 'tokens';
-export type ChartMetricType = 'cost' | 'count' | 'tokens';
+export type RankSortMode = 'count' | 'tokens';
+export type ChartMetricType = 'count' | 'tokens';
 export type ChartPeriod = '1' | '7' | '30';
 
 interface HomeViewState {
@@ -19,8 +19,8 @@ interface HomeViewState {
 export const useHomeViewStore = create<HomeViewState>()(
     persist(
         (set) => ({
-            rankSortMode: 'cost',
-            chartMetricType: 'cost',
+            rankSortMode: 'count',
+            chartMetricType: 'count',
             chartPeriod: '1',
             setRankSortMode: (value) => set({ rankSortMode: value }),
             setChartMetricType: (value) => set({ chartMetricType: value }),
@@ -34,6 +34,17 @@ export const useHomeViewStore = create<HomeViewState>()(
                 chartMetricType: state.chartMetricType,
                 chartPeriod: state.chartPeriod,
             }),
+            merge: (persisted, current) => {
+                const p = (persisted ?? {}) as Partial<HomeViewState>;
+                const rankSortMode = p.rankSortMode === 'tokens' ? 'tokens' : 'count';
+                const chartMetricType = p.chartMetricType === 'tokens' ? 'tokens' : 'count';
+                return {
+                    ...current,
+                    ...p,
+                    rankSortMode,
+                    chartMetricType,
+                };
+            },
         }
     )
 );

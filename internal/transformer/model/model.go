@@ -234,6 +234,10 @@ type InternalLLMRequest struct {
 	// RawRequest is the raw request from the client.
 	RawRequest []byte `json:"-"`
 
+	// RequestPath is the original client request path (e.g. /v1/chat/completions).
+	// Used by passthrough outbound to follow the client path.
+	RequestPath string `json:"-"`
+
 	// RawAPIFormat is the original format of the request.
 	// e.g. the request from the chat/completions endpoint is in the openai/chat_completion format.
 	RawAPIFormat APIFormat `json:"-"`
@@ -328,7 +332,6 @@ func (r *InternalLLMRequest) fillMissingToolCallIDs() {
 		}
 	}
 }
-
 
 func (r *InternalLLMRequest) fillMissingToolCallIDsFromToolMessages() {
 	for msgIndex := 0; msgIndex < len(r.Messages); msgIndex++ {

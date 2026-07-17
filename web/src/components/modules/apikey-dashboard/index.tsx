@@ -16,7 +16,6 @@ import type { JSX } from 'react';
 import {
     ArrowDownToLine,
     ArrowUpFromLine,
-    DollarSign,
     CheckCircle,
     XCircle,
     KeyRound,
@@ -32,7 +31,6 @@ import {
     Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import dayjs from 'dayjs';
 
 export function APIKeyDashboard() {
@@ -71,10 +69,6 @@ export function APIKeyDashboard() {
     }
 
     const { stats, info } = data;
-
-    // Quota calculations
-    const usedCost = stats.total_cost.raw;
-    const maxCost = info.max_cost || 0;
 
     // Expiry calculations
     const expireAt = info.expire_at ? dayjs.unix(info.expire_at) : null;
@@ -164,23 +158,14 @@ export function APIKeyDashboard() {
                                     </div>
                                 </div>
                             </div>
-                            {/* Right: Quota visual */}
+                            {/* Right: Token usage visual */}
                             <div className="relative flex flex-col justify-center border-t bg-muted/30 p-6 md:border-l md:border-t-0 md:p-8">
                                 <Wallet aria-hidden="true" className="pointer-events-none absolute top-6 right-6 h-27 w-27 text-muted-foreground/10" />
-                                <div className="text-lg text-muted-foreground uppercase tracking-wider mb-2">{t('totalCost')}</div>
+                                <div className="text-lg text-muted-foreground uppercase tracking-wider mb-2">{t('totalToken')}</div>
                                 <div className="text-6xl font-bold text-chart-1">
-                                    <AnimatedNumber value={stats.total_cost.formatted.value} />
-                                    <span className="text-lg font-normal text-muted-foreground ml-1">{stats.total_cost.formatted.unit}</span>
+                                    <AnimatedNumber value={stats.total_token.formatted.value} />
+                                    <span className="text-lg font-normal text-muted-foreground ml-1">{stats.total_token.formatted.unit}</span>
                                 </div>
-                                {maxCost > 0 && (
-                                    <div className="mt-4">
-                                        <Progress value={Math.min(100, (usedCost / maxCost) * 100)} className="h-4 *:data-[slot=progress-indicator]:bg-chart-1" />
-                                        <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                                            <span>0</span>
-                                            <span>{maxCost.toFixed(2)} $</span>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -232,42 +217,21 @@ export function APIKeyDashboard() {
                         </div>
                     </div>
 
-                    {/* Row 3: Token & Cost breakdown */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Token breakdown */}
-                        <div className="rounded-2xl border bg-card p-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Zap className="w-5 h-5 text-chart-4" />
-                                <span className="font-semibold">{t('totalToken')}</span>
-                                <span className="ml-auto text-2xl font-bold"><AnimatedNumber value={stats.total_token.formatted.value} /><span className="text-sm font-normal text-muted-foreground ml-1">{stats.total_token.formatted.unit}</span></span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
-                                <div>
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><ArrowDownToLine className="w-3.5 h-3.5" />{t('inputTokens')}</div>
-                                    <div className="text-lg font-semibold"><AnimatedNumber value={stats.input_token.formatted.value} /><span className="text-xs font-normal text-muted-foreground ml-1">{stats.input_token.formatted.unit}</span></div>
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><ArrowUpFromLine className="w-3.5 h-3.5" />{t('outputTokens')}</div>
-                                    <div className="text-lg font-semibold"><AnimatedNumber value={stats.output_token.formatted.value} /><span className="text-xs font-normal text-muted-foreground ml-1">{stats.output_token.formatted.unit}</span></div>
-                                </div>
-                            </div>
+                    {/* Row 3: Token breakdown */}
+                    <div className="rounded-2xl border bg-card p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Zap className="w-5 h-5 text-chart-4" />
+                            <span className="font-semibold">{t('totalToken')}</span>
+                            <span className="ml-auto text-2xl font-bold"><AnimatedNumber value={stats.total_token.formatted.value} /><span className="text-sm font-normal text-muted-foreground ml-1">{stats.total_token.formatted.unit}</span></span>
                         </div>
-                        {/* Cost breakdown */}
-                        <div className="rounded-2xl border bg-card p-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <DollarSign className="w-5 h-5 text-chart-1" />
-                                <span className="font-semibold">{t('totalCost')}</span>
-                                <span className="ml-auto text-2xl font-bold"><AnimatedNumber value={stats.total_cost.formatted.value} /><span className="text-sm font-normal text-muted-foreground ml-1">{stats.total_cost.formatted.unit}</span></span>
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
+                            <div>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><ArrowDownToLine className="w-3.5 h-3.5" />{t('inputTokens')}</div>
+                                <div className="text-lg font-semibold"><AnimatedNumber value={stats.input_token.formatted.value} /><span className="text-xs font-normal text-muted-foreground ml-1">{stats.input_token.formatted.unit}</span></div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
-                                <div>
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><ArrowDownToLine className="w-3.5 h-3.5" />{t('inputCost')}</div>
-                                    <div className="text-lg font-semibold"><AnimatedNumber value={stats.input_cost.formatted.value} /><span className="text-xs font-normal text-muted-foreground ml-1">{stats.input_cost.formatted.unit}</span></div>
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><ArrowUpFromLine className="w-3.5 h-3.5" />{t('outputCost')}</div>
-                                    <div className="text-lg font-semibold"><AnimatedNumber value={stats.output_cost.formatted.value} /><span className="text-xs font-normal text-muted-foreground ml-1">{stats.output_cost.formatted.unit}</span></div>
-                                </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><ArrowUpFromLine className="w-3.5 h-3.5" />{t('outputTokens')}</div>
+                                <div className="text-lg font-semibold"><AnimatedNumber value={stats.output_token.formatted.value} /><span className="text-xs font-normal text-muted-foreground ml-1">{stats.output_token.formatted.unit}</span></div>
                             </div>
                         </div>
                     </div>

@@ -4,7 +4,6 @@ import {
     CheckCircle2,
     XCircle,
     FileText,
-    DollarSign,
     Clock,
     Activity,
     TrendingUp,
@@ -23,7 +22,6 @@ import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { ChannelForm, type ChannelFormData } from './Form';
-import { formatMoney } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -185,7 +183,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                     <TabsContents>
                         <TabsContent value="viewing" >
                             <div className="max-h-[60vh] overflow-y-auto space-y-4 sm:space-y-5">
-                                <dl className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+                                <dl className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                                     <div className="rounded-2xl border bg-linear-to-br from-chart-1/10 to-chart-1/5 p-3 sm:p-4">
                                         <dt className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground">
                                             <Activity className="size-4 text-chart-1" />
@@ -205,17 +203,6 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                         <dd className="text-xl sm:text-2xl font-bold text-chart-3">
                                             {stats.total_token.formatted.value}
                                             <span className="text-xs font-normal ml-1 text-muted-foreground">{stats.total_token.formatted.unit}</span>
-                                        </dd>
-                                    </div>
-
-                                    <div className="rounded-2xl border bg-linear-to-br from-chart-5/10 to-chart-5/5 p-3 sm:p-4">
-                                        <dt className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground">
-                                            <DollarSign className="size-4 text-chart-5" />
-                                            {t('metrics.totalCost')}
-                                        </dt>
-                                        <dd className="text-xl sm:text-2xl font-bold text-chart-5">
-                                            {stats.total_cost.formatted.value}
-                                            <span className="text-xs font-normal ml-1 text-muted-foreground">{stats.total_cost.formatted.unit}</span>
                                         </dd>
                                     </div>
                                 </dl>
@@ -277,37 +264,6 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                             <dd className="text-2xl font-bold text-card-foreground">
                                                 {stats.output_token.formatted.value}
                                                 <span className="text-sm font-normal ml-1 text-muted-foreground">{stats.output_token.formatted.unit}</span>
-                                            </dd>
-                                        </div>
-                                    </dl>
-                                </section>
-
-                                {/* 成本详情 */}
-                                <section className="space-y-3">
-                                    <h4 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                        <DollarSign className="size-3.5" />
-                                        {t('sections.costs')}
-                                    </h4>
-                                    <dl className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-                                        <div className="rounded-2xl border bg-card p-3 sm:p-4 transition-colors hover:bg-accent/5">
-                                            <dt className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-                                                <div className="size-2 rounded-full bg-chart-2" />
-                                                {t('metrics.inputCost')}
-                                            </dt>
-                                            <dd className="text-2xl font-bold text-card-foreground">
-                                                {stats.input_cost.formatted.value}
-                                                <span className="text-sm font-normal ml-1 text-muted-foreground">{stats.input_cost.formatted.unit}</span>
-                                            </dd>
-                                        </div>
-
-                                        <div className="rounded-2xl border bg-card p-3 sm:p-4 transition-colors hover:bg-accent/5">
-                                            <dt className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-                                                <div className="size-2 rounded-full bg-chart-5" />
-                                                {t('metrics.outputCost')}
-                                            </dt>
-                                            <dd className="text-2xl font-bold text-card-foreground">
-                                                {stats.output_cost.formatted.value}
-                                                <span className="text-sm font-normal ml-1 text-muted-foreground">{stats.output_cost.formatted.unit}</span>
                                             </dd>
                                         </div>
                                     </dl>
@@ -395,10 +351,6 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                                         </Badge>
                                                     )}
 
-                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                                        {formatMoney(key.total_cost).formatted.value}
-                                                        {formatMoney(key.total_cost).formatted.unit}
-                                                    </Badge>
                                                 </div>
                                             </div>
                                         ))}

@@ -533,7 +533,7 @@
             "typeAnthropic": "Anthropic",
             "typeGemini": "Gemini",
             "typeVolcengine": "火山引擎",
-            "typePassthrough": "透傳（原樣轉發）",
+            "typePassthrough": "完整直通",
             "autoSync": "自動同步",
             "autoGroup": "自動分組",
             "autoGroupNone": "不自動分組",

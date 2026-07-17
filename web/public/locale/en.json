@@ -533,7 +533,7 @@
             "typeAnthropic": "Anthropic",
             "typeGemini": "Gemini",
             "typeVolcengine": "Volcengine",
-            "typePassthrough": "Passthrough (raw)",
+            "typePassthrough": "Full Passthrough",
             "autoSync": "Auto Sync",
             "autoGroup": "Auto Group",
             "autoGroupNone": "None",

@@ -14,14 +14,9 @@ concurrency:
   group: docker-ghcr-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  REGISTRY: ghcr.io
-  # lowercase required by GHCR
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
-
 jobs:
   build-and-push:
-    name: Build and push Docker image
+    name: Build and push Alpine image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -65,7 +60,6 @@ jobs:
             echo "tag=sha-$SHORT_SHA" >> "$GITHUB_OUTPUT"
           fi
           echo "sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          # GHCR requires lowercase image names
           echo "image=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
@@ -79,29 +73,17 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          # Prefer a classic PAT with write:packages if GITHUB_TOKEN is denied on forks.
           password: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta (Alpine)
-        id: meta-alpine
+      - name: Docker meta
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.version.outputs.image }}
           tags: |
             type=raw,value=latest
-            type=raw,value=latest-alpine
             type=raw,value=${{ steps.version.outputs.tag }}
-            type=raw,value=${{ steps.version.outputs.tag }}-alpine
             type=raw,value=sha-${{ steps.version.outputs.sha }}
-
-      - name: Docker meta (Debian)
-        id: meta-debian
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ steps.version.outputs.image }}
-          tags: |
-            type=raw,value=latest-debian
-            type=raw,value=${{ steps.version.outputs.tag }}-debian
 
       - name: Build and push (Alpine)
         uses: docker/build-push-action@v6
@@ -110,19 +92,7 @@ jobs:
           file: ./scripts/dockerfiles/Dockerfile.alpine
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-alpine.outputs.tags }}
-          labels: ${{ steps.meta-alpine.outputs.labels }}
-          provenance: false
-          sbom: false
-
-      - name: Build and push (Debian)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./scripts/dockerfiles/Dockerfile.debian
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-debian.outputs.tags }}
-          labels: ${{ steps.meta-debian.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           provenance: false
           sbom: false

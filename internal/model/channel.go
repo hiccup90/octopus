@@ -111,9 +111,15 @@ func (c *Channel) GetBaseUrl() string {
 		if bu.URL == "" {
 			continue
 		}
-		if !bestSet || bu.Delay < bestDelay {
+		// delay<=0 means not measured yet; treat as worst so unprobed URLs
+		// are not preferred over real low-latency ones.
+		delay := bu.Delay
+		if delay <= 0 {
+			delay = int(^uint(0) >> 1) // max int
+		}
+		if !bestSet || delay < bestDelay {
 			bestURL = bu.URL
-			bestDelay = bu.Delay
+			bestDelay = delay
 			bestSet = true
 		}
 	}

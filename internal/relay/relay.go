@@ -472,9 +472,15 @@ func (ra *relayAttempt) transformStreamEvent(ctx context.Context, ev sse.Event) 
 		if ev.Data == "" && ev.Type == "" {
 			return nil, nil
 		}
-		// Best-effort: capture last usage-bearing event for token stats / raw log.
+		// Stream events: accumulate usage from message_start / message_delta / final chunks.
 		if ev.Data != "" {
-			ra.metrics.SetRawResponseBody([]byte(ev.Data))
+			ra.metrics.ingestUsageFromRawJSON([]byte(ev.Data))
+			// Prefer keeping a usage-bearing event as the raw log snapshot.
+			if strings.Contains(ev.Data, `"usage"`) || strings.Contains(ev.Data, "usage") {
+				ra.metrics.RawResponseBody = append([]byte(nil), ev.Data...)
+			} else if len(ra.metrics.RawResponseBody) == 0 {
+				ra.metrics.RawResponseBody = append([]byte(nil), ev.Data...)
+			}
 		}
 		return formatSSEFrame(ev.Type, ev.Data), nil
 	}

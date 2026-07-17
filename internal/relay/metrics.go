@@ -42,49 +42,75 @@ func (m *RelayMetrics) SetRawResponseBody(body []byte) {
 	if m == nil || len(body) == 0 {
 		return
 	}
+	// Keep the most complete body for non-stream; for stream keep last event only as fallback.
 	m.RawResponseBody = append([]byte(nil), body...)
-	// Best-effort usage extraction for token counters (OpenAI or Anthropic shapes).
-	var usage struct {
-		// OpenAI
+	m.ingestUsageFromRawJSON(body)
+}
+
+// ingestUsageFromRawJSON extracts tokens from OpenAI / Anthropic JSON (incl. stream events).
+// Later events only overwrite when they carry a positive count (so stream deltas accumulate).
+func (m *RelayMetrics) ingestUsageFromRawJSON(body []byte) {
+	type usageBlock struct {
 		PromptTokens     int64 `json:"prompt_tokens"`
 		CompletionTokens int64 `json:"completion_tokens"`
-		// Anthropic
-		InputTokens  int64 `json:"input_tokens"`
-		OutputTokens int64 `json:"output_tokens"`
+		InputTokens      int64 `json:"input_tokens"`
+		OutputTokens     int64 `json:"output_tokens"`
 	}
 	var envelope struct {
-		Model string `json:"model"`
-		Usage *struct {
-			PromptTokens     int64 `json:"prompt_tokens"`
-			CompletionTokens int64 `json:"completion_tokens"`
-			InputTokens      int64 `json:"input_tokens"`
-			OutputTokens     int64 `json:"output_tokens"`
-		} `json:"usage"`
+		Type  string      `json:"type"`
+		Model string      `json:"model"`
+		Usage *usageBlock `json:"usage"`
+		// Anthropic stream: message_start nests usage under message
+		Message *struct {
+			Model string      `json:"model"`
+			Usage *usageBlock `json:"usage"`
+		} `json:"message"`
+		// OpenAI Responses / some wrappers
+		Response *struct {
+			Model string      `json:"model"`
+			Usage *usageBlock `json:"usage"`
+		} `json:"response"`
 	}
-	if err := json.Unmarshal(body, &envelope); err == nil {
-		if envelope.Model != "" && m.ActualModel == "" {
-			m.ActualModel = envelope.Model
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return
+	}
+
+	if envelope.Model != "" {
+		m.ActualModel = envelope.Model
+	} else if envelope.Message != nil && envelope.Message.Model != "" {
+		m.ActualModel = envelope.Message.Model
+	} else if envelope.Response != nil && envelope.Response.Model != "" {
+		m.ActualModel = envelope.Response.Model
+	}
+
+	var blocks []*usageBlock
+	if envelope.Usage != nil {
+		blocks = append(blocks, envelope.Usage)
+	}
+	if envelope.Message != nil && envelope.Message.Usage != nil {
+		blocks = append(blocks, envelope.Message.Usage)
+	}
+	if envelope.Response != nil && envelope.Response.Usage != nil {
+		blocks = append(blocks, envelope.Response.Usage)
+	}
+
+	for _, u := range blocks {
+		in := u.PromptTokens
+		if in == 0 {
+			in = u.InputTokens
 		}
-		if envelope.Usage != nil {
-			usage.PromptTokens = envelope.Usage.PromptTokens
-			usage.CompletionTokens = envelope.Usage.CompletionTokens
-			usage.InputTokens = envelope.Usage.InputTokens
-			usage.OutputTokens = envelope.Usage.OutputTokens
+		out := u.CompletionTokens
+		if out == 0 {
+			out = u.OutputTokens
 		}
-	}
-	in := usage.PromptTokens
-	out := usage.CompletionTokens
-	if in == 0 {
-		in = usage.InputTokens
-	}
-	if out == 0 {
-		out = usage.OutputTokens
-	}
-	if in > 0 {
-		m.Stats.InputToken = in
-	}
-	if out > 0 {
-		m.Stats.OutputToken = out
+		// Stream: message_start often has input; message_delta has output.
+		// Never clobber a known positive value with zero.
+		if in > 0 {
+			m.Stats.InputToken = in
+		}
+		if out > 0 {
+			m.Stats.OutputToken = out
+		}
 	}
 }
 

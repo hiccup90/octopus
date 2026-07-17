@@ -16,7 +16,8 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # lowercase required by GHCR
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -24,17 +25,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: 'stable'
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
@@ -64,6 +65,8 @@ jobs:
             echo "tag=sha-$SHORT_SHA" >> "$GITHUB_OUTPUT"
           fi
           echo "sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          # GHCR requires lowercase image names
+          echo "image=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -74,15 +77,16 @@ jobs:
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          # Prefer a classic PAT with write:packages if GITHUB_TOKEN is denied on forks.
+          password: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Docker meta (Alpine)
         id: meta-alpine
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ steps.version.outputs.image }}
           tags: |
             type=raw,value=latest
             type=raw,value=latest-alpine
@@ -94,13 +98,13 @@ jobs:
         id: meta-debian
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ steps.version.outputs.image }}
           tags: |
             type=raw,value=latest-debian
             type=raw,value=${{ steps.version.outputs.tag }}-debian
 
       - name: Build and push (Alpine)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./scripts/dockerfiles/Dockerfile.alpine
@@ -108,11 +112,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-alpine.outputs.tags }}
           labels: ${{ steps.meta-alpine.outputs.labels }}
-          build-args: |
-            TARGETPLATFORM
+          provenance: false
+          sbom: false
 
       - name: Build and push (Debian)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./scripts/dockerfiles/Dockerfile.debian
@@ -120,5 +124,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-debian.outputs.tags }}
           labels: ${{ steps.meta-debian.outputs.labels }}
-          build-args: |
-            TARGETPLATFORM
+          provenance: false
+          sbom: false

@@ -472,11 +472,9 @@ func (ra *relayAttempt) transformStreamEvent(ctx context.Context, ev sse.Event) 
 		if ev.Data == "" && ev.Type == "" {
 			return nil, nil
 		}
-		// Best-effort token stats only; never block stream on parse errors.
+		// Best-effort: capture last usage-bearing event for token stats / raw log.
 		if ev.Data != "" {
-			if internalStream, err := ra.outAdapter.TransformStream(ctx, []byte(ev.Data)); err == nil && internalStream != nil {
-				_, _ = ra.inAdapter.TransformStream(ctx, internalStream)
-			}
+			ra.metrics.SetRawResponseBody([]byte(ev.Data))
 		}
 		return formatSSEFrame(ev.Type, ev.Data), nil
 	}
@@ -528,16 +526,9 @@ func (ra *relayAttempt) handleResponse(ctx context.Context, response *http.Respo
 		if err != nil {
 			return fmt.Errorf("failed to read passthrough response: %w", err)
 		}
-		// Still feed adapters for token metrics when response shape is compatible.
-		if internalResponse, err := ra.outAdapter.TransformResponse(ctx, &http.Response{
-			StatusCode: response.StatusCode,
-			Header:     response.Header.Clone(),
-			Body:       io.NopCloser(bytes.NewReader(body)),
-		}); err == nil && internalResponse != nil {
-			if _, err := ra.inAdapter.TransformResponse(ctx, internalResponse); err != nil {
-				// Ignore inbound transform errors in passthrough mode.
-			}
-		}
+		// Keep raw body for logs/metrics. Do NOT feed Anthropic JSON through
+		// OpenAI-shaped InternalLLMResponse (produces empty chat.completion shells).
+		ra.metrics.SetRawResponseBody(body)
 		contentType := response.Header.Get("Content-Type")
 		if contentType == "" {
 			contentType = "application/json"
@@ -564,6 +555,14 @@ func (ra *relayAttempt) handleResponse(ctx context.Context, response *http.Respo
 
 // collectResponse 收集响应信息
 func (ra *relayAttempt) collectResponse() {
+	// Passthrough already stored raw body + usage; skip OpenAI-shaped aggregation.
+	if ra.channel != nil && ra.channel.Type == outbound.OutboundTypePassthrough {
+		if ra.metrics.ActualModel == "" && ra.internalRequest != nil {
+			ra.metrics.ActualModel = ra.internalRequest.Model
+		}
+		return
+	}
+
 	internalResponse, err := ra.inAdapter.GetInternalResponse(ra.c.Request.Context())
 	if err != nil || internalResponse == nil {
 		return

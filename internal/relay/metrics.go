@@ -26,6 +26,9 @@ type RelayMetrics struct {
 	// 请求和响应内容
 	InternalRequest  *transformerModel.InternalLLMRequest
 	InternalResponse *transformerModel.InternalLLMResponse
+	// RawResponseBody is preferred for passthrough logging (Anthropic/etc).
+	// Avoids re-encoding into OpenAI chat.completion shape for the UI.
+	RawResponseBody []byte
 
 	// 统计指标
 	ActualModel string
@@ -33,6 +36,56 @@ type RelayMetrics struct {
 
 	// 参数覆盖
 	ParamOverride string
+}
+
+func (m *RelayMetrics) SetRawResponseBody(body []byte) {
+	if m == nil || len(body) == 0 {
+		return
+	}
+	m.RawResponseBody = append([]byte(nil), body...)
+	// Best-effort usage extraction for token counters (OpenAI or Anthropic shapes).
+	var usage struct {
+		// OpenAI
+		PromptTokens     int64 `json:"prompt_tokens"`
+		CompletionTokens int64 `json:"completion_tokens"`
+		// Anthropic
+		InputTokens  int64 `json:"input_tokens"`
+		OutputTokens int64 `json:"output_tokens"`
+	}
+	var envelope struct {
+		Model string `json:"model"`
+		Usage *struct {
+			PromptTokens     int64 `json:"prompt_tokens"`
+			CompletionTokens int64 `json:"completion_tokens"`
+			InputTokens      int64 `json:"input_tokens"`
+			OutputTokens     int64 `json:"output_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(body, &envelope); err == nil {
+		if envelope.Model != "" && m.ActualModel == "" {
+			m.ActualModel = envelope.Model
+		}
+		if envelope.Usage != nil {
+			usage.PromptTokens = envelope.Usage.PromptTokens
+			usage.CompletionTokens = envelope.Usage.CompletionTokens
+			usage.InputTokens = envelope.Usage.InputTokens
+			usage.OutputTokens = envelope.Usage.OutputTokens
+		}
+	}
+	in := usage.PromptTokens
+	out := usage.CompletionTokens
+	if in == 0 {
+		in = usage.InputTokens
+	}
+	if out == 0 {
+		out = usage.OutputTokens
+	}
+	if in > 0 {
+		m.Stats.InputToken = in
+	}
+	if out > 0 {
+		m.Stats.OutputToken = out
+	}
 }
 
 func NewRelayMetrics(apiKeyID int, requestModel string, req *transformerModel.InternalLLMRequest) *RelayMetrics {
@@ -135,8 +188,12 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 		relayLog.Ftut = int(m.FirstTokenTime.Sub(m.StartTime).Milliseconds())
 	}
 
-	// Usage
-	if m.InternalResponse != nil && m.InternalResponse.Usage != nil {
+	// Usage (prefer stats already filled from raw/internal response)
+	if m.Stats.InputToken > 0 || m.Stats.OutputToken > 0 {
+		relayLog.InputTokens = int(m.Stats.InputToken)
+		relayLog.OutputTokens = int(m.Stats.OutputToken)
+		relayLog.Cost = m.Stats.InputCost + m.Stats.OutputCost
+	} else if m.InternalResponse != nil && m.InternalResponse.Usage != nil {
 		relayLog.InputTokens = int(m.InternalResponse.Usage.PromptTokens)
 		relayLog.OutputTokens = int(m.InternalResponse.Usage.CompletionTokens)
 		relayLog.Cost = m.Stats.InputCost + m.Stats.OutputCost
@@ -169,8 +226,10 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 		}
 	}
 
-	// 响应内容
-	if m.InternalResponse != nil {
+	// 响应内容：透传优先写原始 body，避免 Anthropic 被误显示成空 chat.completion
+	if len(m.RawResponseBody) > 0 {
+		relayLog.ResponseContent = string(m.RawResponseBody)
+	} else if m.InternalResponse != nil {
 		respForLog := m.filterResponseForLog(m.InternalResponse)
 		if respJSON, jsonErr := json.Marshal(respForLog); jsonErr == nil {
 			if m.InternalResponse.Usage != nil && m.InternalResponse.Usage.AnthropicUsage {

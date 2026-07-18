@@ -104,6 +104,10 @@ func buildRequestBody(request *model.InternalLLMRequest) ([]byte, error) {
 			return nil, fmt.Errorf("failed to unmarshal raw request: %w", err)
 		}
 		raw["model"] = request.Model
+		// OpenAI streaming often omits final usage unless include_usage is set.
+		// Mirror Plus ChatOutbound: force it so logs can capture prompt/completion tokens.
+		// Skip Anthropic /messages bodies (different protocol).
+		ensureOpenAIStreamIncludeUsage(raw, request)
 		body, err := json.Marshal(raw)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal passthrough request: %w", err)
@@ -118,6 +122,54 @@ func buildRequestBody(request *model.InternalLLMRequest) ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 	return body, nil
+}
+
+// ensureOpenAIStreamIncludeUsage sets stream_options.include_usage=true for
+// OpenAI-compatible streaming requests so upstream returns a final usage chunk.
+func ensureOpenAIStreamIncludeUsage(raw map[string]any, request *model.InternalLLMRequest) {
+	if raw == nil || request == nil {
+		return
+	}
+	if isAnthropicPath(request.RequestPath) {
+		return
+	}
+
+	streaming := false
+	if request.Stream != nil && *request.Stream {
+		streaming = true
+	}
+	if v, ok := raw["stream"]; ok {
+		switch t := v.(type) {
+		case bool:
+			streaming = t
+		case string:
+			streaming = strings.EqualFold(t, "true") || t == "1"
+		}
+	}
+	if !streaming {
+		return
+	}
+
+	// Only inject for OpenAI Chat-style paths when path is known.
+	// Empty path: still inject (common when only body is available).
+	path := strings.ToLower(request.RequestPath)
+	if path != "" &&
+		!strings.Contains(path, "chat/completions") &&
+		!strings.Contains(path, "/v1/chat") {
+		// Responses / embeddings / images: don't force chat-only stream_options.
+		if strings.Contains(path, "/responses") ||
+			strings.Contains(path, "/embeddings") ||
+			strings.Contains(path, "/images") {
+			return
+		}
+	}
+
+	opts, _ := raw["stream_options"].(map[string]any)
+	if opts == nil {
+		opts = map[string]any{}
+	}
+	opts["include_usage"] = true
+	raw["stream_options"] = opts
 }
 
 func isAnthropicPath(path string) bool {

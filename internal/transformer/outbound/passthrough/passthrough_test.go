@@ -1,8 +1,11 @@
 package passthrough
 
 import (
+	"encoding/json"
 	"net/url"
 	"testing"
+
+	"github.com/bestruirui/octopus/internal/transformer/model"
 )
 
 func TestBuildURL(t *testing.T) {
@@ -37,5 +40,54 @@ func TestIsAnthropicPath(t *testing.T) {
 	}
 	if isAnthropicPath("/v1/chat/completions") {
 		t.Fatal("expected false")
+	}
+}
+
+func TestEnsureOpenAIStreamIncludeUsage(t *testing.T) {
+	streamTrue := true
+	req := &model.InternalLLMRequest{
+		Model:       "gpt-x",
+		Stream:      &streamTrue,
+		RequestPath: "/v1/chat/completions",
+		RawRequest:  []byte(`{"model":"old","stream":true,"messages":[{"role":"user","content":"hi"}]}`),
+	}
+	body, err := buildRequestBody(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw["model"] != "gpt-x" {
+		t.Fatalf("model=%v", raw["model"])
+	}
+	opts, ok := raw["stream_options"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing stream_options: %s", string(body))
+	}
+	if opts["include_usage"] != true {
+		t.Fatalf("include_usage=%v", opts["include_usage"])
+	}
+}
+
+func TestEnsureOpenAIStreamIncludeUsage_SkipAnthropic(t *testing.T) {
+	streamTrue := true
+	req := &model.InternalLLMRequest{
+		Model:       "claude-x",
+		Stream:      &streamTrue,
+		RequestPath: "/v1/messages",
+		RawRequest:  []byte(`{"model":"old","stream":true,"messages":[{"role":"user","content":"hi"}]}`),
+	}
+	body, err := buildRequestBody(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["stream_options"]; ok {
+		t.Fatalf("should not inject stream_options for anthropic path: %s", string(body))
 	}
 }

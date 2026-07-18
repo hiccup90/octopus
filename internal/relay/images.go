@@ -147,8 +147,10 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 			continue
 		}
 
-		// channel.Type 限制：仅 OpenAI Chat/Responses
-		if channel.Type != outbound.OutboundTypeOpenAIChat && channel.Type != outbound.OutboundTypeOpenAIResponse {
+		// channel.Type: OpenAI Chat/Responses + 完整直通(Passthrough)
+		if channel.Type != outbound.OutboundTypeOpenAIChat &&
+			channel.Type != outbound.OutboundTypeOpenAIResponse &&
+			channel.Type != outbound.OutboundTypePassthrough {
 			iter.Skip(channel.ID, 0, channel.Name, fmt.Sprintf("unsupported channel type: %d", channel.Type))
 			continue
 		}
@@ -484,6 +486,54 @@ func parseMultipartModelAndStream(bc *bodycache.BodyCache, boundary string) (mod
 	return modelName, stream, nil
 }
 
+// buildImagesUpstreamURL builds the upstream images URL.
+// passthrough=true: follow client path (e.g. /v1/images/generations).
+// passthrough=false: baseURL path + endpoint (e.g. /images/generations).
+func buildImagesUpstreamURL(baseURL, endpoint, clientPath string, passthrough bool) (*url.URL, error) {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if base == "" {
+		return nil, fmt.Errorf("base url is empty")
+	}
+	parsedURL, err := url.Parse(base)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse base url: %w", err)
+	}
+
+	if !passthrough {
+		parsedURL.Path = strings.TrimRight(parsedURL.Path, "/") + endpoint
+		return parsedURL, nil
+	}
+
+	clientPath = strings.TrimSpace(clientPath)
+	if clientPath == "" {
+		clientPath = endpoint
+		if !strings.HasPrefix(clientPath, "/") {
+			clientPath = "/" + clientPath
+		}
+		// default OpenAI-style when client path missing
+		if !strings.HasPrefix(clientPath, "/v1/") {
+			clientPath = "/v1" + clientPath
+		}
+	}
+	if !strings.HasPrefix(clientPath, "/") {
+		clientPath = "/" + clientPath
+	}
+
+	basePath := strings.TrimRight(parsedURL.Path, "/")
+	suffix := clientPath
+	if basePath != "" {
+		if clientPath == basePath {
+			suffix = ""
+		} else if strings.HasPrefix(clientPath, basePath+"/") {
+			suffix = strings.TrimPrefix(clientPath, basePath)
+		} else if strings.HasPrefix(clientPath, "/v1/") && (basePath == "/v1" || strings.HasSuffix(basePath, "/v1")) {
+			suffix = strings.TrimPrefix(clientPath, "/v1")
+		}
+	}
+	parsedURL.Path = basePath + suffix
+	return parsedURL, nil
+}
+
 func imagesAttempt(
 	ctx context.Context,
 	endpoint string,
@@ -499,13 +549,14 @@ func imagesAttempt(
 	metrics *imagesRelayMetrics,
 	actualModel string,
 ) (statusCode int, written bool, usage *imagesUsage, upstreamCT string, err error) {
-	// 构建 URL（baseUrl.Path 后追加 endpoint）
+	// 构建 URL：
+	// - Chat/Response：baseUrl + endpoint（如 /images/generations）
+	// - 完整直通：path 跟客户端走（与聊天透传一致）
 	baseURL := channel.GetBaseUrl()
-	parsedURL, err := url.Parse(strings.TrimSuffix(baseURL, "/"))
+	parsedURL, err := buildImagesUpstreamURL(baseURL, endpoint, c.Request.URL.Path, channel.Type == outbound.OutboundTypePassthrough)
 	if err != nil {
-		return 0, false, nil, "", fmt.Errorf("failed to parse base url: %w", err)
+		return 0, false, nil, "", err
 	}
-	parsedURL.Path = parsedURL.Path + endpoint
 
 	var bodyReader io.Reader
 	var contentType string

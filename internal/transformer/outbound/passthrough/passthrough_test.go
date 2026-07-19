@@ -91,3 +91,45 @@ func TestEnsureOpenAIStreamIncludeUsage_SkipAnthropic(t *testing.T) {
 		t.Fatalf("should not inject stream_options for anthropic path: %s", string(body))
 	}
 }
+
+func TestEnsureOpenAIStreamIncludeUsage_SkipEmptyPath(t *testing.T) {
+	streamTrue := true
+	req := &model.InternalLLMRequest{
+		Model:       "gpt-x",
+		Stream:      &streamTrue,
+		RequestPath: "",
+		RawRequest:  []byte(`{"model":"old","stream":true,"messages":[{"role":"user","content":"hi"}]}`),
+	}
+	body, err := buildRequestBody(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["stream_options"]; ok {
+		t.Fatalf("should not inject stream_options for empty path: %s", string(body))
+	}
+}
+
+func TestEnsureOpenAIStreamIncludeUsage_SkipResponses(t *testing.T) {
+	streamTrue := true
+	req := &model.InternalLLMRequest{
+		Model:       "gpt-x",
+		Stream:      &streamTrue,
+		RequestPath: "/v1/responses",
+		RawRequest:  []byte(`{"model":"old","stream":true}`),
+	}
+	body, err := buildRequestBody(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["stream_options"]; ok {
+		t.Fatalf("should not inject stream_options for responses path: %s", string(body))
+	}
+}

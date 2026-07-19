@@ -5,26 +5,17 @@ import (
 
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/price"
 )
 
+// LLMPriceAddToDB registers model names in the LLM catalog.
+// Price fields are left zero: external price sync is disabled for this fork.
 func LLMPriceAddToDB(modelNames []string, ctx context.Context) error {
 	newLLMInfos := make([]model.LLMInfo, 0, len(modelNames))
-	newLLMNames := make([]string, 0, len(modelNames))
 	for _, modelName := range modelNames {
 		if modelName == "" {
 			continue
 		}
-		modelPrice := price.GetLLMPrice(modelName)
-		if modelPrice != nil {
-			newLLMInfos = append(newLLMInfos, model.LLMInfo{
-				Name:     modelName,
-				LLMPrice: *modelPrice,
-			})
-		} else {
-			newLLMInfos = append(newLLMInfos, model.LLMInfo{Name: modelName})
-		}
-		newLLMNames = append(newLLMNames, modelName)
+		newLLMInfos = append(newLLMInfos, model.LLMInfo{Name: modelName})
 	}
 	if len(newLLMInfos) > 0 {
 		return op.LLMBatchCreate(newLLMInfos, ctx)
@@ -32,6 +23,8 @@ func LLMPriceAddToDB(modelNames []string, ctx context.Context) error {
 	return nil
 }
 
+// LLMPriceDeleteFromDBWithNoPrice removes catalog rows that still have zero prices.
+// Name kept for call-site compatibility with model sync.
 func LLMPriceDeleteFromDBWithNoPrice(modelNames []string, ctx context.Context) error {
 	if len(modelNames) == 0 {
 		return nil

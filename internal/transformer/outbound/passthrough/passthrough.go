@@ -124,13 +124,16 @@ func buildRequestBody(request *model.InternalLLMRequest) ([]byte, error) {
 	return body, nil
 }
 
-// ensureOpenAIStreamIncludeUsage sets stream_options.include_usage=true for
-// OpenAI-compatible streaming requests so upstream returns a final usage chunk.
+// ensureOpenAIStreamIncludeUsage sets stream_options.include_usage=true only for
+// explicit OpenAI Chat Completions streaming paths. Unknown/empty paths are left
+// untouched to avoid surprising non-chat gateways.
 func ensureOpenAIStreamIncludeUsage(raw map[string]any, request *model.InternalLLMRequest) {
 	if raw == nil || request == nil {
 		return
 	}
-	if isAnthropicPath(request.RequestPath) {
+
+	path := strings.ToLower(request.RequestPath)
+	if path == "" || !strings.Contains(path, "chat/completions") {
 		return
 	}
 
@@ -148,20 +151,6 @@ func ensureOpenAIStreamIncludeUsage(raw map[string]any, request *model.InternalL
 	}
 	if !streaming {
 		return
-	}
-
-	// Only inject for OpenAI Chat-style paths when path is known.
-	// Empty path: still inject (common when only body is available).
-	path := strings.ToLower(request.RequestPath)
-	if path != "" &&
-		!strings.Contains(path, "chat/completions") &&
-		!strings.Contains(path, "/v1/chat") {
-		// Responses / embeddings / images: don't force chat-only stream_options.
-		if strings.Contains(path, "/responses") ||
-			strings.Contains(path, "/embeddings") ||
-			strings.Contains(path, "/images") {
-			return
-		}
 	}
 
 	opts, _ := raw["stream_options"].(map[string]any)

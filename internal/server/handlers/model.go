@@ -6,7 +6,6 @@ import (
 
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/price"
 	"github.com/bestruirui/octopus/internal/server/middleware"
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/server/router"
@@ -37,14 +36,6 @@ func init() {
 		AddRoute(
 			router.NewRoute("/delete", http.MethodPost).
 				Handle(deleteLLM),
-		).
-		AddRoute(
-			router.NewRoute("/update-price", http.MethodPost).
-				Handle(updateLLMPrice),
-		).
-		AddRoute(
-			router.NewRoute("/last-update-time", http.MethodGet).
-				Handle(getLastUpdateTime),
 		)
 	router.NewGroupRouter("/v1").
 		Use(middleware.APIKeyAuth()).
@@ -169,18 +160,4 @@ func deleteLLM(c *gin.Context) {
 		return
 	}
 	resp.Success(c, nil)
-}
-
-func updateLLMPrice(c *gin.Context) {
-	err := price.UpdateLLMPrice(c.Request.Context())
-	if err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	resp.Success(c, nil)
-}
-
-func getLastUpdateTime(c *gin.Context) {
-	time := price.GetLastUpdateTime()
-	resp.Success(c, time)
 }
